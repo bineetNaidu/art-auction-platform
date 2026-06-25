@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  /* Obsidian Minimalist Palette */
+  --color-bg-main: #0B0B0C;
+  --color-bg-card: #121214;
+  --color-text-primary: #F5F5F7;
+  --color-text-muted: #8E8E93;
+  --color-gold-accent: #D4AF37;
+  --color-crimson-alert: #E63946;
+
+  /* Typography Scale Mappings */
+  --font-editorial: var(--font-cormorant), serif;
+  --font-interface: var(--font-inter), sans-serif;
+  --font-ticker: var(--font-jetbrains), monospace;
+
+  /* Custom Last-Minute Aura Pulse */
+  @keyframes dynamic-pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(230, 57, 70, 0.2); border-color: rgba(230, 57, 70, 0.4); }
+    50% { box-shadow: 0 0 20px rgba(230, 57, 70, 0.6); border-color: rgba(230, 57, 70, 1); }
+  }
+  --animate-pulse-crimson: dynamic-pulse 1.5s infinite ease-in-out;
+}
+
+/* Global Reset Overrides */
+html, body {
+  background-color: var(--color-bg-main);
+  color: var(--color-text-primary);
+  font-family: var(--font-interface);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
