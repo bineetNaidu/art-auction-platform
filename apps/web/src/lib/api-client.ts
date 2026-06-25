@@ -12,16 +12,16 @@ interface RequestOptions extends RequestInit {
  */
 export async function apiClient<T>(
   endpoint: string,
-  options: RequestOptions = {}
+  options: RequestOptions = {},
 ): Promise<ApiResponse<T>> {
   const { token, headers, ...restOptions } = options;
-  
+
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const url = `${BASE_URL}${cleanEndpoint}`;
 
   const requestHeaders = new Headers(headers);
   requestHeaders.set('Content-Type', 'application/json');
-  
+
   if (token) {
     requestHeaders.set('Authorization', `Bearer ${token}`);
   }
