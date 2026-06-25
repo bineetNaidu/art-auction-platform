@@ -1,23 +1,30 @@
+# Lift the build argument to the absolute top of the file to scope it across all stages
+ARG APP_NAME
+
 # Stage 1: Build compilation layer using lightweight Node Alpine base
 FROM node:20-alpine AS builder
+# Re-declare the argument inside this specific build stage scope
+ARG APP_NAME
 WORKDIR /app
 
 # Copy root configurations and workspace manifest locks
 COPY package*.json tsconfig.base.json ./
 COPY packages/ ./packages/
-COPY apps/ ./apps/
 
-# Clean install dependencies and compile all workspaces
+# Pluck ONLY the targeted microservice to keep 'apps/web' out of the build matrix
+COPY apps/${APP_NAME}/ ./apps/${APP_NAME}/
+
+# Clean install dependencies and compile the isolated workspace matrix
 RUN npm ci
 RUN npm run build
 
 # Stage 2: Clean runtime target allocation layer
 FROM node:20-alpine AS runner
-WORKDIR /app
 
 # Dynamic build-time variable defining which microservice targeting pipeline to trigger
 ARG APP_NAME
 ENV APP_TARGET=${APP_NAME}
+WORKDIR /app
 
 # Copy workspace state manifests and the global node_modules
 COPY package*.json ./
