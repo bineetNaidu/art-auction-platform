@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Isolated Datastore Layer (Alpine-based)
+  postgres:
+    image: postgres:16-alpine
+    container_name: art_auction_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: supersecretpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # High-Speed Cache & In-Memory Distributed Ledger (Alpine-based)
+  redis:
+    image: redis:7.2-alpine
+    container_name: art_auction_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Event-Streaming Backbone (Apache Kafka KRaft Combined Mode)
+  kafka:
+    image: apache/kafka:3.7.0 # Apache Kafka's official lightweight native image
+    container_name: art_auction_kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # KRaft Specific Settings (Eliminating Zookeeper dependency)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@localhost:9093'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      # Listeners configurations
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://localhost:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
+      # Log Retention / Offsets
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  platform-network:
+    driver: bridge
