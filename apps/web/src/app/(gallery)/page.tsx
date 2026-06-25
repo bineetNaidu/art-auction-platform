@@ -46,7 +46,7 @@ export default async function GlobalCatalogBoard() {
               Status Flag: {errorCode}
             </span>
           </div>
-          <a 
+          <a
             href="/"
             className="w-full bg-white/4 hover:bg-white/8 border border-white/8 text-text-primary font-interface text-xs uppercase tracking-widest py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
@@ -68,6 +68,7 @@ export default async function GlobalCatalogBoard() {
       artwork: associatedArtwork,
     };
   });
+
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12">
@@ -99,20 +100,23 @@ export default async function GlobalCatalogBoard() {
       ) : (
         /* Structural Masonry Layout Matrix */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* Replace the contents of the grid layout container with this snippet */}
           {aggregatedCards.map((item) => (
-            <Link 
-              key={item.id} 
-              href={`/arena/${item.id}`}
-              className="group block bg-bg-card border border-white/5 hover:border-white/12 rounded-xl overflow-hidden transition-all duration-300 transform hover:-translate-y-1 shadow-lg"
+            <div
+              key={item.id}
+              className="group relative bg-bg-card border border-white/5 hover:border-white/12 rounded-xl overflow-hidden transition-all duration-300 shadow-lg flex flex-col h-full"
             >
-              {/* Media Container Layer */}
-              <div className="relative aspect-square w-full bg-bg-main overflow-hidden border-b border-white/4">
+              {/* INTERACTIVE ZONE A: Media Aspect Frame -> Routes strictly to the Live Auction Arena */}
+              <Link
+                href={`/arena/${item.id}`}
+                className="relative aspect-square w-full bg-bg-main overflow-hidden border-b border-white/4 block z-0"
+              >
                 {item.artwork?.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={item.artwork.imageUrl}
                     alt={item.artwork.title}
-                    className="object-cover w-full h-full transition-transform duration-700 ease-out group-hover:scale-105"
+                    className="object-cover w-full h-full transition-transform duration-700 ease-out group-hover:scale-102"
                     loading="lazy"
                   />
                 ) : (
@@ -121,31 +125,42 @@ export default async function GlobalCatalogBoard() {
                   </div>
                 )}
 
-                {/* Relational Status Pill Indicator */}
-                <div className="absolute top-4 right-4">
-                  <span className={`font-interface text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border backdrop-blur-md font-medium ${
-                    item.status === "active" 
+                {/* Floating Status Pill */}
+                <div className="absolute top-4 right-4 z-10">
+                  <span className={`font-interface text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border backdrop-blur-md font-medium ${item.status === "active"
                       ? "bg-gold-accent/10 border-gold-accent/30 text-gold-accent"
                       : item.status === "pending"
-                      ? "bg-text-muted/10 border-text-muted/30 text-text-muted"
-                      : "bg-crimson-alert/10 border-crimson-alert/30 text-crimson-alert"
-                  }`}>
+                        ? "bg-text-muted/10 border-text-muted/30 text-text-muted"
+                        : "bg-crimson-alert/10 border-crimson-alert/30 text-crimson-alert"
+                    }`}>
                     {item.status}
                   </span>
                 </div>
-              </div>
+              </Link>
 
-              {/* Text Description Typography Matrix */}
-              <div className="p-6">
-                <span className="font-interface text-[10px] tracking-widest text-text-muted uppercase block mb-1">
-                  {item.artwork?.isVerified ? "✓ Verified Provenance" : "Pending Authentication"}
-                </span>
-                <h3 className="font-editorial text-xl text-text-primary group-hover:text-gold-accent transition-colors truncate mb-4">
-                  {item.artwork?.title || "Untitled Exhibition Block"}
-                </h3>
+              {/* CONTENT & METADATA FRAME */}
+              <div className="p-6 flex flex-col grow justify-between">
+                <div>
+                  <span className="font-interface text-[10px] tracking-widest text-text-muted uppercase block mb-1">
+                    {item.artwork?.isVerified ? "✓ Verified Provenance" : "Pending Authentication"}
+                  </span>
 
-                {/* Core Financial Metric Panels */}
-                <div className="grid grid-cols-2 gap-4 border-t border-white/4 pt-4">
+                  {/* INTERACTIVE ZONE B: Editorial Asset Title -> Elevated via relative z-indexing to link directly to long-term documentation profile */}
+                  <h3 className="mb-4 relative z-10">
+                    <Link
+                      href={`/artworks/${item.artworkId}`}
+                      className="font-editorial text-xl text-text-primary hover:text-gold-accent transition-colors block truncate hover:underline underline-offset-4"
+                    >
+                      {item.artwork?.title || "Untitled Exhibition Block"}
+                    </Link>
+                  </h3>
+                </div>
+
+                {/* INTERACTIVE ZONE C: Financial Analytics Ticker -> Routes cleanly back to Arena for instant trading floor interactions */}
+                <Link
+                  href={`/arena/${item.id}`}
+                  className="grid grid-cols-2 gap-4 border-t border-white/4 pt-4 hover:bg-white/1 transition-colors rounded-lg relative z-0"
+                >
                   <div>
                     <span className="font-interface text-[9px] uppercase text-text-muted tracking-wider flex items-center gap-1 mb-1">
                       <Tag size={10} /> {item.status === "active" ? "Highest Bid" : "Opening Valuation"}
@@ -167,9 +182,9 @@ export default async function GlobalCatalogBoard() {
                       })}
                     </span>
                   </div>
-                </div>
+                </Link>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}
