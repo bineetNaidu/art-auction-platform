@@ -4,7 +4,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { Auction, Artwork, Bid } from "@platform/shared-types";
-import ArenaRoomClient from "./ArenaRoomClient";
+import { ArenaRoomClient } from "./ArenaRoomClient";
 
 interface PageProps {
   params: Promise<{ auctionId: string }>;
