@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Cormorant_Garamond, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import Navbar from "@/components/navbar";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -33,12 +34,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html 
-      lang="en" 
+    <html
+      lang="en"
       className={`${inter.variable} ${cormorant.variable} ${jetbrains.variable}`}
     >
       <body className="antialiased selection:bg-gold-accent/30 selection:text-text-primary">
-        {/* Global Navigation Wrapper can go here later */}
+        {/* Global Navigation Shell Elements */}
+        <Navbar />
+
+        {/* Viewport content execution container */}
         <main className="relative min-height-screen">
           {children}
         </main>
