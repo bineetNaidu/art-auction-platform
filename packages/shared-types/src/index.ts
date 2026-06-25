@@ -33,3 +33,17 @@ export interface Bid {
   amount: number;
   timestamp: Date;
 }
+
+/**
+ * Standardized API Response structure for the entire platform ecosystem
+ */
+export interface ApiResponse<T = any> {
+  success: boolean;
+  message?: string;
+  data?: T;
+  error?: {
+    code: string;
+    details?: any;
+  };
+  timestamp: string;
+}

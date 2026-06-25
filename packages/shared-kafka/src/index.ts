@@ -1,4 +1,4 @@
-import { Kafka, Producer, Consumer, KafkaConfig } from 'kafkajs';
+import { Kafka, Producer, Consumer, KafkaConfig, Partitioners } from 'kafkajs';
 
 export class KafkaBrokerClient {
   private kafka: Kafka;
@@ -10,7 +10,11 @@ export class KafkaBrokerClient {
 
   async getProducer(): Promise<Producer> {
     if (!this.producerInstance) {
-      this.producerInstance = this.kafka.producer();
+      // Explicitly declaration of the LegacyPartitioner prevents log warnings
+      // and guarantees consistent key-to-partition hashing strategies
+      this.producerInstance = this.kafka.producer({
+        createPartitioner: Partitioners.LegacyPartitioner,
+      });
       await this.producerInstance.connect();
     }
     return this.producerInstance;
