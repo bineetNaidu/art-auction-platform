@@ -1,12 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
+import { AnyZodObject, ZodError, ZodTypeAny } from 'zod';
 import { ApiResponse } from '@platform/shared-types';
 
 /**
  * Reusable Express middleware running structural input sanitization over incoming body data
  */
 export const validateBody =
-  (schema: AnyZodObject) => async (req: Request, res: Response, next: NextFunction) => {
+  (schema: AnyZodObject | ZodTypeAny) =>
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       await schema.parseAsync(req.body);
       return next();
