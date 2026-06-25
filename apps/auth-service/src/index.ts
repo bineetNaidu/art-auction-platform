@@ -1,9 +1,11 @@
 import express from 'express';
-import { config } from './config.js';
-import { initializeDatabase } from './db.js';
-import { registerUser, loginUser } from './controller.js';
+import { config } from './config';
+import { initializeDatabase } from './db';
+import { registerUser, loginUser } from './controller';
 import { KafkaBrokerClient } from '@platform/shared-kafka';
 import { createLogger } from '@platform/shared-logger';
+import { LoginUserSchema, RegisterUserSchema } from './schema';
+import { validateBody } from './validator/validation';
 
 const logger = createLogger('auth-service:main');
 const app = express();
@@ -25,8 +27,8 @@ async function main() {
   logger.info('Connected to Kafka Broker server successfully.');
 
   // Mount API paths
-  app.post('/auth/register', registerUser(producer, logger));
-  app.post('/auth/login', loginUser(logger));
+  app.post('/auth/register', validateBody(RegisterUserSchema), registerUser(producer, logger));
+  app.post('/auth/login', validateBody(LoginUserSchema) ,loginUser(logger));
 
   app.listen(config.port, () => {
     logger.info(`Auth Service container listening perfectly over port destination: ${config.port}`);
