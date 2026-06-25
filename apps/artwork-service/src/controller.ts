@@ -1,6 +1,7 @@
-import { Request, Response } from 'express';
-import { db } from './db.js';
-import { artworks } from './schema.js';
+import { NextFunction, Request, Response } from 'express';
+import { db } from './db';
+import { eq } from 'drizzle-orm';
+import { artworks } from './schema';
 import { PlatformEventName, CloudEvent } from '@platform/shared-events';
 import { ApiResponse } from '@platform/shared-types';
 import { Producer } from 'kafkajs';
@@ -110,3 +111,77 @@ export const getArtworks = (logger: any) => async (_req: Request, res: Response)
     return res.status(500).json(errorRes);
   }
 };
+
+/**
+ * Retrieves a single artwork profile by its unique ID record
+ */
+export const getArtworkById =
+  (logger: any) => async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      const [artwork] = await db.select().from(artworks).where(eq(artworks.id, id)).limit(1);
+
+      if (!artwork) {
+        const errorRes: ApiResponse = {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            details: 'No active artwork entry maps to the provided identifier',
+          },
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(404).json(errorRes);
+      }
+
+      const successRes: ApiResponse = {
+        success: true,
+        data: artwork,
+        timestamp: new Date().toISOString(),
+      };
+      return res.status(200).json(successRes);
+    } catch (err) {
+      logger.error(
+        `Lookup fault tracking parameter execution context for entry ID: ${req.params.id}`,
+      );
+      return next(err);
+    }
+  };
+
+/**
+ * Updates the administrative verification provenance marker tag of an asset
+ */
+export const verifyArtwork =
+  (logger: any) => async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { isVerified } = req.body;
+
+      const [updatedArtwork] = await db
+        .update(artworks)
+        .set({ isVerified, createdAt: new Date() })
+        .where(eq(artworks.id, id))
+        .returning();
+
+      if (!updatedArtwork) {
+        const errorRes: ApiResponse = {
+          success: false,
+          error: { code: 'NOT_FOUND', details: 'Target artwork record missing' },
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(404).json(errorRes);
+      }
+
+      logger.info(`Administrative verification status updated to [${isVerified}] for entry: ${id}`);
+
+      const successRes: ApiResponse = {
+        success: true,
+        message: 'Artwork provenance authentication marker updated cleanly.',
+        data: updatedArtwork,
+        timestamp: new Date().toISOString(),
+      };
+      return res.status(200).json(successRes);
+    } catch (err) {
+      return next(err);
+    }
+  };

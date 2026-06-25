@@ -1,9 +1,11 @@
 import express from 'express';
-import { config } from './config.js';
-import { initializeDatabase } from './db.js';
-import { createArtwork, getArtworks } from './controller.js';
+import { config } from './config';
+import { initializeDatabase } from './db';
+import { createArtwork, getArtworks, getArtworkById, verifyArtwork } from './controller';
+import { validateBody, errorHandler } from '@platform/shared-common';
 import { KafkaBrokerClient } from '@platform/shared-kafka';
 import { createLogger } from '@platform/shared-logger';
+import { CreateArtworkSchema, VerifyArtworkSchema } from './schema';
 
 const logger = createLogger('artwork-service:main');
 const app = express();
@@ -25,8 +27,13 @@ async function main() {
   logger.info('Connected to Kafka Broker server successfully.');
 
   // Mount API paths
-  app.post('/artworks', createArtwork(producer, logger));
+  app.post('/artworks', validateBody(CreateArtworkSchema), createArtwork(producer, logger));
   app.get('/artworks', getArtworks(logger));
+  app.get('/artworks/:id', getArtworkById(logger));
+  app.patch('/artworks/:id/verify', validateBody(VerifyArtworkSchema), verifyArtwork(logger));
+
+  // Enforce centralized unhandled error parsing logic at the absolute base of the pipeline
+  app.use(errorHandler(logger));
 
   app.listen(config.port, () => {
     logger.info(
