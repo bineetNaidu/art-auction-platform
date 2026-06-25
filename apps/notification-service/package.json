@@ -1,0 +1,24 @@
+{
+  "name": "notification-service",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node ./dist/index.js",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@platform/shared-events": "*",
+    "@platform/shared-kafka": "*",
+    "@platform/shared-logger": "*",
+    "@platform/shared-types": "*",
+    "drizzle-orm": "^0.30.6",
+    "pg": "^8.11.5"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.5",
+    "drizzle-kit": "^0.21.4",
+    "tsx": "^4.7.1"
+  }
+}
