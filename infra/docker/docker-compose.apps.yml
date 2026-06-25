@@ -1,0 +1,130 @@
+services:
+  # Central Front-Door Edge Reverse Proxy Router
+  gateway-service:
+    build:
+      context: ../../
+      dockerfile: apps/gateway-service/Dockerfile
+      args:
+        APP_NAME: gateway-service
+    container_name: art_gateway_app
+    ports:
+      - "8080:3000" # Exposes container port 3000 onto laptop host port 8080
+    environment:
+      - PORT=3000
+      - JWT_SECRET=fallback-super-secure-token-secret-key-string
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - ARTWORK_SERVICE_URL=http://artwork-service:3002
+      - AUCTION_SERVICE_URL=http://auction-service:3003
+      - BID_SERVICE_URL=http://bid-service:3004
+      - ANALYTICS_SERVICE_URL=http://analytics-service:3005
+    networks:
+      - platform-network
+    depends_on:
+      - auth-service
+      - artwork-service
+      - auction-service
+      - bid-service
+      - analytics-service
+
+  # Authoritative Identity Verification Bounded Context
+  auth-service:
+    build:
+      context: ../../
+      dockerfile: apps/auth-service/Dockerfile
+      args:
+        APP_NAME: auth-service
+    container_name: art_auth_app
+    environment:
+      - PORT=3001
+      - DATABASE_URL=postgres://postgres:supersecretpassword@postgres:5432/auth_db
+      - KAFKA_BROKER=kafka:9092
+      - JWT_SECRET=fallback-super-secure-token-secret-key-string
+    networks:
+      - platform-network
+    restart: always
+
+  # Digital Art Registry and Asset Inventory Bounded Context
+  artwork-service:
+    build:
+      context: ../../
+      dockerfile: apps/artwork-service/Dockerfile
+      args:
+        APP_NAME: artwork-service
+    container_name: art_artwork_app
+    environment:
+      - PORT=3002
+      - DATABASE_URL=postgres://postgres:supersecretpassword@postgres:5432/artwork_db
+      - KAFKA_BROKER=kafka:9092
+    networks:
+      - platform-network
+    restart: always
+
+  # Scheduling Window and State Allocation Bounded Context
+  auction-service:
+    build:
+      context: ../../
+      dockerfile: apps/auction-service/Dockerfile
+      args:
+        APP_NAME: auction-service
+    container_name: art_auction_app
+    environment:
+      - PORT=3003
+      - DATABASE_URL=postgres://postgres:supersecretpassword@postgres:5432/auction_db
+      - KAFKA_BROKER=kafka:9092
+    networks:
+      - platform-network
+    restart: always
+
+  # Fast Validation Bid Ledger Transactional Engine
+  bid-service:
+    build:
+      context: ../../
+      dockerfile: apps/bid-service/Dockerfile
+      args:
+        APP_NAME: bid-service
+    container_name: art_bid_app
+    environment:
+      - PORT=3004
+      - DATABASE_URL=postgres://postgres:supersecretpassword@postgres:5432/bid_db
+      - KAFKA_BROKER=kafka:9092
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - platform-network
+    restart: always
+
+  # Pure Asynchronous Alert Consumer Worker Processes
+  notification-service:
+    build:
+      context: ../../
+      dockerfile: apps/notification-service/Dockerfile
+      args:
+        APP_NAME: notification-service
+    container_name: art_notification_app
+    environment:
+      - DATABASE_URL=postgres://postgres:supersecretpassword@postgres:5432/notification_db
+      - KAFKA_BROKER=kafka:9092
+    networks:
+      - platform-network
+    restart: always
+
+  # Denormalized Read-Projections Business Dashboards Aggregator
+  analytics-service:
+    build:
+      context: ../../
+      dockerfile: apps/analytics-service/Dockerfile
+      args:
+        APP_NAME: analytics-service
+    container_name: art_analytics_app
+    environment:
+      - PORT=3005
+      - DATABASE_URL=postgres://postgres:supersecretpassword@postgres:5432/analytics_db
+      - KAFKA_BROKER=kafka:9092
+    networks:
+      - platform-network
+    restart: always
+
+networks:
+  platform-network:
+    name: docker_platform-network
+    external: true
