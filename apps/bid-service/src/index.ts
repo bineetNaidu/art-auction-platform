@@ -1,7 +1,9 @@
 import express from 'express';
-import { config } from './config.js';
-import { initializeDatabase } from './db.js';
-import { placeBid } from './controller.js';
+import { config } from './config';
+import { initializeDatabase } from './db';
+import { placeBid, getBidsByAuction } from './controller';
+import { PlaceBidSchema } from './schema';
+import { validateBody, errorHandler } from '@platform/shared-common';
 import { KafkaBrokerClient } from '@platform/shared-kafka';
 import { createLogger } from '@platform/shared-logger';
 
@@ -21,10 +23,15 @@ async function main() {
   const producer = await kafkaClient.getProducer();
   logger.info('Connected to Kafka Broker server successfully.');
 
-  app.post('/bids', placeBid(producer, logger));
+  // Mount API paths integrated with explicit Zod payload verification guards
+  app.post('/bids', validateBody(PlaceBidSchema), placeBid(producer, logger));
+  app.get('/bids/auction/:auctionId', getBidsByAuction(logger));
+
+  // Anchor the unified exception processor at the very base of the routing stack
+  app.use(errorHandler(logger));
 
   app.listen(config.port, () => {
-    logger.info(`Bid Service processing cluster online over port destination: ${config.port}`);
+    logger.info(`Hardened Bid Transaction Service cluster online over port: ${config.port}`);
   });
 }
 
