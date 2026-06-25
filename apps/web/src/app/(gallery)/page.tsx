@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { AlertCircle, RefreshCw, Clock, Tag } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { Auction, Artwork } from "@platform/shared-types";
@@ -12,10 +13,14 @@ function formatCurrency(cents: number): string {
 }
 
 export default async function GlobalCatalogBoard() {
-  // Execute parallel fetch architecture for optimal network performance
+  // Read the cookie storage container asynchronously on the server engine
+  const cookieStore = await cookies();
+  const token = cookieStore.get("aura_session_token")?.value;
+
+  // Execute parallel fetch architecture passing the token down securely
   const [auctionsResponse, artworksResponse] = await Promise.all([
-    apiClient<Auction[]>("/auctions", { cache: "no-store" }),
-    apiClient<Artwork[]>("/artworks", { cache: "no-store" }),
+    apiClient<Auction[]>("/auctions", { token, cache: "no-store" }),
+    apiClient<Artwork[]>("/artworks", { token, cache: "no-store" }),
   ]);
 
   // HIGH-FIDELITY ERROR HANDLING MATRIX
@@ -70,7 +75,7 @@ export default async function GlobalCatalogBoard() {
       <div className="border-b border-white/6 pb-8 mb-12 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
         <div>
           <span className="font-ticker text-xs uppercase tracking-widest text-gold-accent mb-2 block">
-            Live Global Boards
+            Live Global Boards {token ? "• Authenticated" : "• Public View"}
           </span>
           <h1 className="font-editorial text-4xl md:text-5xl text-text-primary tracking-wide italic">
             Current Exhibitions
