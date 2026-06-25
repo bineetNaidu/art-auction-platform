@@ -5,7 +5,7 @@ import { registerUser, loginUser } from './controller';
 import { KafkaBrokerClient } from '@platform/shared-kafka';
 import { createLogger } from '@platform/shared-logger';
 import { LoginUserSchema, RegisterUserSchema } from './schema';
-import { validateBody } from './validator/validation';
+import { validateBody, errorHandler } from '@platform/shared-common';
 
 const logger = createLogger('auth-service:main');
 const app = express();
@@ -29,6 +29,9 @@ async function main() {
   // Mount API paths
   app.post('/auth/register', validateBody(RegisterUserSchema), registerUser(producer, logger));
   app.post('/auth/login', validateBody(LoginUserSchema), loginUser(logger));
+
+  // Consuming the abstracted global handler
+  app.use(errorHandler(logger));
 
   app.listen(config.port, () => {
     logger.info(`Auth Service container listening perfectly over port destination: ${config.port}`);

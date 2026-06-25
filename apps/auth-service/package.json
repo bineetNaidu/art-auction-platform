@@ -9,6 +9,7 @@
     "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
+    "@platform/shared-common": "*",
     "@platform/shared-events": "*",
     "@platform/shared-kafka": "*",
     "@platform/shared-logger": "*",
