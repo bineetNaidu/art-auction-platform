@@ -7,7 +7,7 @@ COPY package*.json tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY apps/ ./apps/
 
-# Clear path mappings, install dependencies, and build shared compilation binaries
+# Clean install dependencies and compile all workspaces
 RUN npm ci
 RUN npm run build
 
@@ -19,10 +19,12 @@ WORKDIR /app
 ARG APP_NAME
 ENV APP_TARGET=${APP_NAME}
 
-# Copy workspace state manifests and built distribution packages
+# Copy workspace state manifests and the global node_modules
 COPY package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages ./packages/dist
+
+# Copy the entire packages folder to preserve the symlink directory structure
+COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/apps/${APP_TARGET}/dist ./apps/${APP_TARGET}/dist
 COPY --from=builder /app/apps/${APP_TARGET}/package.json ./apps/${APP_TARGET}/package.json
 
@@ -31,5 +33,5 @@ ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
 
-# Dynamically trigger the execution entry-point of the specific target service
+# Execute the entry-point relative to the preserved workspace paths
 CMD node apps/${APP_TARGET}/dist/index.js
