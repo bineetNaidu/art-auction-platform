@@ -1,5 +1,5 @@
 import express from 'express';
-import cors from "cors";
+import cors from 'cors';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { config } from './config';
 import { rateLimit } from 'express-rate-limit';
@@ -14,12 +14,14 @@ const app = express();
  * Configure Cross-Origin Resource Sharing (CORS) Policy
  * Expressly authorizes our containerized/local Next.js frontend origin
  */
-app.use(cors({
-  origin: 'http://localhost:3000', // Matches your apps/web server address
-  credentials: true, // Permits cookie attachments or Authorization headers across origins
-  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(
+  cors({
+    origin: 'http://localhost:3000', // Matches your apps/web server address
+    credentials: true, // Permits cookie attachments or Authorization headers across origins
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }),
+);
 
 /**
  * Configure Global Rate Limiter to mitigate DDoS/Brute-Force vectors at the edge
