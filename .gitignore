@@ -19,4 +19,6 @@ yarn-error.log*
 logs/
 *.log
 
+# web
 .next
+next-env.d.ts
