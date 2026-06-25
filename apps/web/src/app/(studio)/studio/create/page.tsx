@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Paintbrush, ArrowRight, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { Artwork } from "@platform/shared-types";
 
 export default function StudioCreatePage() {
   const router = useRouter();
@@ -37,13 +38,15 @@ export default function StudioCreatePage() {
     }
 
     // Execute protected asset dispatch
-    const response = await apiClient("/artworks", {
+    const response = await apiClient<Artwork>("/artworks", {
       method: "POST",
       token,
       body: JSON.stringify({ title, description, imageUrl, artistId }),
     });
 
     if (response.success) {
+      const createdArtwork = response.data;
+
       setFeedback({
         type: "success",
         message: "Asset permanently committed to verification ledger. Forwarding to scheduler...",
@@ -56,8 +59,9 @@ export default function StudioCreatePage() {
       setArtistId("");
 
       // Deep transition into scheduling pipeline after registration
+      // Automatically pass the identifiers forward on the query string matrix
       setTimeout(() => {
-        router.push("/studio/schedule");
+        router.push(`/studio/schedule?artworkId=${createdArtwork!.id}&artistId=${createdArtwork!.artistId}`);
       }, 2000);
     } else {
       setFeedback({

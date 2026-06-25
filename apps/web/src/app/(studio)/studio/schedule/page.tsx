@@ -3,11 +3,14 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { CalendarClock, ArrowRight, Loader2, AlertCircle, CheckCircle2, DollarSign } from "lucide-react";
+import { CalendarClock, Loader2, AlertCircle, CheckCircle2, DollarSign } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 
 export default function StudioSchedulePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Core state metrics mapped to backend specification
   const [artworkId, setArtworkId] = useState("");
@@ -18,6 +21,14 @@ export default function StudioSchedulePage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  useEffect(() => {
+    const queryArtworkId = searchParams.get("artworkId");
+    const queryArtistId = searchParams.get("artistId");
+
+    if (queryArtworkId) setArtworkId(queryArtworkId);
+    if (queryArtistId) setSellerId(queryArtistId);
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
