@@ -19,3 +19,4 @@ infra/
 │   └── init.sql                  # Automated script to spin up the target schema list
 └── kafka/
     └── topic-provisioner.sh      # Automated orchestration scripts to map partitions/compaction
+```
