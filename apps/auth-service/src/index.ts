@@ -28,7 +28,7 @@ async function main() {
 
   // Mount API paths
   app.post('/auth/register', validateBody(RegisterUserSchema), registerUser(producer, logger));
-  app.post('/auth/login', validateBody(LoginUserSchema) ,loginUser(logger));
+  app.post('/auth/login', validateBody(LoginUserSchema), loginUser(logger));
 
   app.listen(config.port, () => {
     logger.info(`Auth Service container listening perfectly over port destination: ${config.port}`);
