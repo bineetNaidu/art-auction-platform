@@ -9,13 +9,15 @@
     "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
+    "@platform/shared-common": "*",
     "@platform/shared-events": "*",
     "@platform/shared-kafka": "*",
     "@platform/shared-logger": "*",
     "@platform/shared-types": "*",
     "drizzle-orm": "^0.30.6",
     "express": "^4.19.2",
-    "pg": "^8.11.5"
+    "pg": "^8.11.5",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

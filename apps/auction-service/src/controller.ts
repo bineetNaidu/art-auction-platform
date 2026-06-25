@@ -1,32 +1,20 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { db } from './db.js';
-import { auctions } from './schema.js';
+import { auctions } from './schema';
+import { eq } from 'drizzle-orm';
 import { PlatformEventName, CloudEvent } from '@platform/shared-events';
 import { ApiResponse } from '@platform/shared-types';
 import { Producer } from 'kafkajs';
 import crypto from 'crypto';
 
 /**
- * Creates an auction timeline mapping record and logs an auction.created event
+ * Schedules an auction entry and emits an auction.created event message
  */
 export const createAuction =
-  (producer: Producer, logger: any) => async (req: Request, res: Response) => {
+  (producer: Producer, logger: any) => async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { artworkId, sellerId, startPrice, startTime, endTime } = req.body;
 
-      if (!artworkId || !sellerId || !startPrice || !startTime || !endTime) {
-        const errorRes: ApiResponse = {
-          success: false,
-          error: {
-            code: 'BAD_REQUEST',
-            details: 'Missing required validation fields for auction registration',
-          },
-          timestamp: new Date().toISOString(),
-        };
-        return res.status(400).json(errorRes);
-      }
-
-      // Capture entry to database layer
       const [newAuction] = await db
         .insert(auctions)
         .values({
@@ -39,7 +27,6 @@ export const createAuction =
         })
         .returning();
 
-      // Map contract validation message body
       const auctionCreatedEvent: CloudEvent<PlatformEventName.AUCTION_CREATED> = {
         event: PlatformEventName.AUCTION_CREATED,
         traceId: crypto.randomUUID(),
@@ -51,22 +38,13 @@ export const createAuction =
         },
       };
 
-      // Broadcast change payload asynchronously to Kafka
       try {
         await producer.send({
           topic: 'platform.auctions',
-          messages: [
-            {
-              key: newAuction.id,
-              value: JSON.stringify(auctionCreatedEvent),
-            },
-          ],
+          messages: [{ key: newAuction.id, value: JSON.stringify(auctionCreatedEvent) }],
         });
-        logger.info(
-          `Kafka broadcast verification event fired cleanly for auction: ${newAuction.id}`,
-        );
       } catch (kafkaError) {
-        logger.error('Downstream Kafka connection notification delivery slipped:', kafkaError);
+        logger.error('Failed to stream auction scheduling event:', kafkaError);
       }
 
       const successRes: ApiResponse = {
@@ -77,35 +55,91 @@ export const createAuction =
       };
       return res.status(201).json(successRes);
     } catch (err) {
-      logger.error('Auction timeline processing registration error:', err);
-      const errorRes: ApiResponse = {
-        success: false,
-        error: { code: 'INTERNAL_SERVER_ERROR' },
-        timestamp: new Date().toISOString(),
-      };
-      return res.status(500).json(errorRes);
+      return next(err);
     }
   };
 
 /**
- * Lists all active and scheduled auction elements
+ * Locates an isolated auction record profile by its UUID identifier
  */
-export const getAuctions = (logger: any) => async (_req: Request, res: Response) => {
-  try {
-    const data = await db.select().from(auctions);
-    const successRes: ApiResponse = {
-      success: true,
-      data,
-      timestamp: new Date().toISOString(),
-    };
-    return res.status(200).json(successRes);
-  } catch (err) {
-    logger.error('Failed to parse auction metrics query list:', err);
-    const errorRes: ApiResponse = {
-      success: false,
-      error: { code: 'INTERNAL_SERVER_ERROR' },
-      timestamp: new Date().toISOString(),
-    };
-    return res.status(500).json(errorRes);
-  }
-};
+export const getAuctionById =
+  (logger: any) => async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      const [auction] = await db.select().from(auctions).where(eq(auctions.id, id)).limit(1);
+
+      if (!auction) {
+        const errorRes: ApiResponse = {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            details: 'No active auction mapped to the provided identifier',
+          },
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(404).json(errorRes);
+      }
+
+      const successRes: ApiResponse = {
+        success: true,
+        data: auction,
+        timestamp: new Date().toISOString(),
+      };
+      return res.status(200).json(successRes);
+    } catch (err) {
+      logger.error(`Error processing auction lookup trace for ID: ${req.params.id}`);
+      return next(err);
+    }
+  };
+
+/**
+ * Triggers an administrative soft-state cancellation sequence over an auction pipeline
+ */
+export const cancelAuction =
+  (logger: any) => async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      const [cancelledAuction] = await db
+        .update(auctions)
+        .set({ status: 'cancelled', createdAt: new Date() })
+        .where(eq(auctions.id, id))
+        .returning();
+
+      if (!cancelledAuction) {
+        const errorRes: ApiResponse = {
+          success: false,
+          error: { code: 'NOT_FOUND', details: 'Target auction item not found for cancellation' },
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(404).json(errorRes);
+      }
+
+      logger.warn(`Auction event [${id}] has been marked cancelled manually.`);
+
+      const successRes: ApiResponse = {
+        success: true,
+        message: 'Auction lifecycle context terminated successfully.',
+        data: cancelledAuction,
+        timestamp: new Date().toISOString(),
+      };
+      return res.status(200).json(successRes);
+    } catch (err) {
+      return next(err);
+    }
+  };
+
+/**
+ * Fetch bulk auction inventory records
+ */
+export const getAuctions =
+  (_logger: any) => async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await db.select().from(auctions);
+      const successRes: ApiResponse = { success: true, data, timestamp: new Date().toISOString() };
+      return res.status(200).json(successRes);
+    } catch (err) {
+      return next(err);
+    }
+  };
