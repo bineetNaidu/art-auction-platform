@@ -1,22 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { CalendarClock, Loader2, AlertCircle, CheckCircle2, DollarSign } from "lucide-react";
+import { CalendarClock, Loader2, AlertCircle, CheckCircle2, DollarSign, ShieldCheck } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
-import { useSearchParams } from "next/navigation";
-import { useEffect } from "react";
 import { Artwork } from "@platform/shared-types";
+import { getClientSession, getClientToken } from "@/lib/auth";
 
 export default function StudioSchedulePage() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    // Core state metrics mapped to backend specification
     const [artworkId, setArtworkId] = useState("");
-    const [sellerId, setSellerId] = useState("");
-    const [priceInput, setPriceInput] = useState(""); // Managed as raw decimal string on UI thread
+    const [sellerId, setSellerId] = useState(""); // Immutably resolved from profile context
+    const [priceInput, setPriceInput] = useState("");
     const [startTime, setStartTime] = useState("");
     const [endTime, setEndTime] = useState("");
 
@@ -27,23 +25,36 @@ export default function StudioSchedulePage() {
     const [isFetchingVault, setIsFetchingVault] = useState(false);
 
     useEffect(() => {
-        const queryArtworkId = searchParams.get("artworkId");
-        const queryArtistId = searchParams.get("artistId");
+        const session = getClientSession();
+        if (!session) {
+            router.replace("/login");
+            return;
+        }
 
-        if (queryArtworkId && queryArtistId) {
+        // ROLE GUARD: Buyers cannot access scheduling tools
+        if (session.role === "buyer") {
+            router.replace("/");
+            return;
+        }
+
+        // Enforce immutable seller payload alignment matching current user context identity
+        const currentUserId = session.userId || session.id;
+        if (currentUserId) {
+            setSellerId(currentUserId);
+        }
+
+        const queryArtworkId = searchParams.get("artworkId");
+        if (queryArtworkId) {
             setArtworkId(queryArtworkId);
-            setSellerId(queryArtistId);
         } else {
-            // DIRECT ACCESS FALLBACK: Fetch the creator's registered inventory
+            // Direct access fallback lookup loop
             const loadCreatorVault = async () => {
                 setIsFetchingVault(true);
-                const match = document.cookie.match(/(^| )aura_session_token=([^;]+)/);
-                const token = match ? match[2] : undefined;
+                const token = getClientToken();
 
                 if (token) {
                     const response = await apiClient<Artwork[]>("/artworks", { token });
                     if (response.success && response.data) {
-                        // In a real production setup, the API would filter by the current logged-in identity
                         setMyArtworks(response.data);
                     }
                 }
@@ -52,74 +63,53 @@ export default function StudioSchedulePage() {
 
             loadCreatorVault();
         }
-    }, [searchParams]);
+    }, [searchParams, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         setFeedback(null);
 
-        // Enforce chronological correctness before executing network traffic
         const startTimestamp = new Date(startTime).getTime();
         const endTimestamp = new Date(endTime).getTime();
 
         if (endTimestamp <= startTimestamp) {
-            setFeedback({
-                type: "error",
-                message: "Temporal paradox detected. The ending ceiling limit must strictly exceed the initialization timestamp.",
-            });
+            setFeedback({ type: "error", message: "The ending timestamp must strictly exceed the start window." });
             setIsLoading(false);
             return;
         }
 
         const floatPrice = parseFloat(priceInput);
         if (isNaN(floatPrice) || floatPrice <= 0) {
-            setFeedback({
-                type: "error",
-                message: "Opening valuation metadata must be a positive numeric metric.",
-            });
+            setFeedback({ type: "error", message: "Opening valuation must be a positive number." });
             setIsLoading(false);
             return;
         }
 
-        // STRICT CURRENCY VALUE RULE: Absolute conversion to integer cents
         const startPriceInCents = Math.round(floatPrice * 100);
+        const token = getClientToken();
 
-        // Extract authorization context securely
-        const match = document.cookie.match(/(^| )aura_session_token=([^;]+)/);
-        const token = match ? match[2] : undefined;
-
-        if (!token) {
-            setFeedback({
-                type: "error",
-                message: "Authorization expired. Re-authenticate to broadcast market windows.",
-            });
+        if (!token || !sellerId) {
+            setFeedback({ type: "error", message: "Authorization context lost. Re-login." });
             setIsLoading(false);
             return;
         }
 
-        // Dispatch parameters to the transaction layer matrix
         const response = await apiClient("/auctions", {
             method: "POST",
             token,
             body: JSON.stringify({
                 artworkId,
-                sellerId,
-                startPrice: startPriceInCents, // Forwarded safely as integer cents
+                sellerId, // Safely tied to the verified user session state
+                startPrice: startPriceInCents,
                 startTime: new Date(startTime).toISOString(),
                 endTime: new Date(endTime).toISOString(),
             }),
         });
 
         if (response.success) {
-            setFeedback({
-                type: "success",
-                message: "Auction parameters registered and queued. Relocating to catalog overview boards...",
-            });
-
-            // Purge state inputs cleanly
+            setFeedback({ type: "success", message: "Auction live framework successfully established." });
             setArtworkId("");
-            setSellerId("");
             setPriceInput("");
             setStartTime("");
             setEndTime("");
@@ -129,10 +119,7 @@ export default function StudioSchedulePage() {
                 router.push("/");
             }, 2000);
         } else {
-            setFeedback({
-                type: "error",
-                message: response.message || "Ecosystem gateway rejected the temporal event layout.",
-            });
+            setFeedback({ type: "error", message: response.message || "Gateway rejected the event parameters." });
         }
         setIsLoading(false);
     };
@@ -155,9 +142,7 @@ export default function StudioSchedulePage() {
                 <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`mb-8 p-4 rounded-xl border text-xs font-interface flex items-center gap-3 ${feedback.type === "error"
-                        ? "bg-crimson-alert/10 border-crimson-alert/20 text-crimson-alert"
-                        : "bg-gold-accent/10 border-gold-accent/20 text-gold-accent"
+                    className={`mb-8 p-4 rounded-xl border text-xs font-interface flex items-center gap-3 ${feedback.type === "error" ? "bg-crimson-alert/10 border-crimson-alert/20 text-crimson-alert" : "bg-gold-accent/10 border-gold-accent/20 text-gold-accent"
                         }`}
                 >
                     {feedback.type === "error" ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
@@ -167,22 +152,16 @@ export default function StudioSchedulePage() {
 
             {/* Structural Forms Mapping */}
             <form onSubmit={handleSubmit} className="space-y-6">
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label className="block font-interface text-xs uppercase tracking-wider text-text-muted mb-2">
-                            Target Artwork Hash Reference (Artwork ID)
+                            Target Artwork Hash Reference
                         </label>
                         {myArtworks.length > 0 ? (
                             <select
                                 value={artworkId}
-                                onChange={(e) => {
-                                    setArtworkId(e.target.value);
-                                    // Automatically pull and bind the corresponding seller reference
-                                    const selected = myArtworks.find(art => art.id === e.target.value);
-                                    if (selected) setSellerId(selected.artistId);
-                                }}
-                                className="w-full bg-bg-card border border-white/8 focus:border-gold-accent text-sm text-text-primary px-4 py-3 rounded-lg outline-none"
+                                onChange={(e) => setArtworkId(e.target.value)}
+                                className="w-full bg-bg-card border border-white/8 focus:border-gold-accent text-sm text-text-primary px-4 py-3 rounded-lg outline-none font-interface"
                             >
                                 <option value="">Select from your registered vault...</option>
                                 {myArtworks.map((art) => (
@@ -195,6 +174,7 @@ export default function StudioSchedulePage() {
                             /* Fallback text input if vault is empty or offline */
                             <input
                                 type="text"
+                                required
                                 value={artworkId}
                                 onChange={(e) => setArtworkId(e.target.value)}
                                 placeholder="Enter cryptographic artwork hash reference..."
@@ -204,17 +184,20 @@ export default function StudioSchedulePage() {
                     </div>
 
                     <div>
-                        <label className="block font-interface text-xs uppercase tracking-wider text-text-muted mb-2">
+                        <label className="font-interface text-xs uppercase tracking-wider text-text-muted mb-2 flex items-center gap-1.5">
                             Consignor Identity Reference (Seller ID)
+                            <span className="text-gold-accent inline-flex items-center gap-0.5 normal-case text-[10px]">
+                                <ShieldCheck size={11} /> Verified Account
+                            </span>
                         </label>
                         <input
                             type="text"
                             required
+                            readOnly
+                            disabled
                             value={sellerId}
-                            onChange={(e) => setSellerId(e.target.value)}
-                            disabled={isLoading}
-                            className="w-full bg-bg-card border border-white/8 focus:border-gold-accent text-sm text-text-primary px-4 py-3 rounded-lg font-ticker outline-none transition-colors duration-200"
-                            placeholder="e.g., usr_ledger_9921x"
+                            className="w-full bg-white/1 border border-white/4 text-sm text-text-muted px-4 py-3 rounded-lg font-ticker outline-none select-none cursor-not-allowed opacity-50"
+                            placeholder="Resolving account reference..."
                         />
                     </div>
                 </div>
@@ -235,7 +218,7 @@ export default function StudioSchedulePage() {
                             value={priceInput}
                             onChange={(e) => setPriceInput(e.target.value)}
                             disabled={isLoading}
-                            className="w-full bg-bg-card border border-white/8 focus:border-gold-accent text-sm text-text-primary pl-10 pr-4 py-3 rounded-lg font-ticker outline-none transition-colors duration-200"
+                            className="w-full bg-bg-card border border-white/8 focus:border-gold-accent text-sm text-text-primary pl-10 pr-4 py-3 rounded-lg font-ticker outline-none"
                             placeholder="15000.00"
                         />
                     </div>
@@ -255,7 +238,7 @@ export default function StudioSchedulePage() {
                             value={startTime}
                             onChange={(e) => setStartTime(e.target.value)}
                             disabled={isLoading}
-                            className="w-full bg-bg-card border border-white/8 focus:border-gold-accent text-sm text-text-primary px-4 py-3 rounded-lg font-ticker uppercase outline-none transition-colors duration-200"
+                            className="w-full bg-bg-card border border-white/8 focus:border-gold-accent text-sm text-text-primary px-4 py-3 rounded-lg font-ticker uppercase outline-none"
                         />
                     </div>
 
@@ -269,7 +252,7 @@ export default function StudioSchedulePage() {
                             value={endTime}
                             onChange={(e) => setEndTime(e.target.value)}
                             disabled={isLoading}
-                            className="w-full bg-bg-card border border-white/8 focus:border-gold-accent text-sm text-text-primary px-4 py-3 rounded-lg font-ticker uppercase outline-none transition-colors duration-200"
+                            className="w-full bg-bg-card border border-white/8 focus:border-gold-accent text-sm text-text-primary px-4 py-3 rounded-lg font-ticker uppercase outline-none"
                         />
                     </div>
                 </div>
@@ -280,16 +263,10 @@ export default function StudioSchedulePage() {
                         whileHover={{ scale: isLoading ? 1 : 1.01 }}
                         whileTap={{ scale: isLoading ? 1 : 0.99 }}
                         type="submit"
-                        disabled={isLoading}
+                        disabled={isLoading || !sellerId}
                         className="bg-text-primary hover:bg-gold-accent disabled:bg-white/2 text-bg-main disabled:text-text-muted font-interface font-medium text-xs uppercase tracking-widest py-3.5 px-6 rounded-lg flex items-center justify-center gap-2 cursor-pointer transition-colors duration-300"
                     >
-                        {isLoading ? (
-                            <Loader2 size={14} className="animate-spin" />
-                        ) : (
-                            <>
-                                Queue Event Parameters <CalendarClock size={14} />
-                            </>
-                        )}
+                        {isLoading ? <Loader2 size={14} className="animate-spin" /> : <>Queue Event Parameters <CalendarClock size={14} /></>}
                     </motion.button>
                 </div>
 

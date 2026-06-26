@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Paintbrush, Loader2, AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { Artwork } from "@platform/shared-types";
+import { getClientSession, getClientToken } from "@/lib/auth";
 
 export default function StudioCreatePage() {
   const router = useRouter();
@@ -14,54 +15,40 @@ export default function StudioCreatePage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  const [artistId, setArtistId] = useState(""); // Automatically resolved from session profile
+  const [artistId, setArtistId] = useState("");
 
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   // Automatically resolve authenticated user context on component mount
   useEffect(() => {
-    const match = document.cookie.match(/(^| )aura_session_token=([^;]+)/);
-    if (match) {
-      const token = match[2];
-      try {
-        const payloadBase64 = token.split(".")[1];
-        if (payloadBase64) {
-          const decodedPayload = JSON.parse(window.atob(payloadBase64));
-          // Bind the authenticated user's ID to the immutable artist profile field
-          if (decodedPayload.userId) {
-            setArtistId(decodedPayload.userId);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to decode token context signature:", error);
-        setFeedback({
-          type: "error",
-          message: "Failed to resolve identity signatures. Please re-authenticate.",
-        });
-      }
-    } else {
-      setFeedback({
-        type: "error",
-        message: "No active session detected. Access restricted.",
-      });
+    const session = getClientSession();
+
+    if (!session) {
+      router.replace("/login");
+      return;
     }
-  }, []);
+
+    // ROLE GUARD: Instantly deflect ordinary buyers away from administrative creator loops
+    if (session.role === "buyer") {
+      router.replace("/");
+      return;
+    }
+
+    const resolvedId = session.userId || session.id;
+    if (resolvedId) {
+      setArtistId(resolvedId);
+    }
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setFeedback(null);
 
-    // Pull token directly from client context cookies
-    const match = document.cookie.match(/(^| )aura_session_token=([^;]+)/);
-    const token = match ? match[2] : undefined;
-
+    const token = getClientToken();
     if (!token || !artistId) {
-      setFeedback({
-        type: "error",
-        message: "Authorization profiles missing. Re-route to entry gateway.",
-      });
+      setFeedback({ type: "error", message: "Authorization profile missing. Re-authenticate." });
       setIsLoading(false);
       return;
     }
@@ -73,7 +60,7 @@ export default function StudioCreatePage() {
       body: JSON.stringify({ title, description, imageUrl, artistId }),
     });
 
-    if (response.success) {
+    if (response.success && response.data) {
       const createdArtwork = response.data;
 
       setFeedback({
@@ -89,13 +76,10 @@ export default function StudioCreatePage() {
       // Deep transition into scheduling pipeline after registration
       // Automatically pass the identifiers forward on the query string matrix
       setTimeout(() => {
-        router.push(`/studio/schedule?artworkId=${createdArtwork!.id}&artistId=${createdArtwork!.artistId}`);
+        router.push(`/studio/schedule?artworkId=${createdArtwork.id}&artistId=${createdArtwork.artistId}`);
       }, 2000);
     } else {
-      setFeedback({
-        type: "error",
-        message: response.message || "Failed to commit asset parameters to the decentralized node.",
-      });
+      setFeedback({ type: "error", message: response.message || "Failed to commit asset parameters." });
     }
     setIsLoading(false);
   };
@@ -118,9 +102,7 @@ export default function StudioCreatePage() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`mb-8 p-4 rounded-xl border text-xs font-interface flex items-center gap-3 ${feedback.type === "error"
-              ? "bg-crimson-alert/10 border-crimson-alert/20 text-crimson-alert"
-              : "bg-gold-accent/10 border-gold-accent/20 text-gold-accent"
+          className={`mb-8 p-4 rounded-xl border text-xs font-interface flex items-center gap-3 ${feedback.type === "error" ? "bg-crimson-alert/10 border-crimson-alert/20 text-crimson-alert" : "bg-gold-accent/10 border-gold-accent/20 text-gold-accent"
             }`}
         >
           {feedback.type === "error" ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
@@ -150,7 +132,7 @@ export default function StudioCreatePage() {
           <div>
             <label className="font-interface text-xs uppercase tracking-wider text-text-muted mb-2 flex items-center gap-1.5">
               Creator Identity Key (Artist ID)
-              <span className="text-gold-accent inline-flex items-center gap-0.5 normal-case text-[10px] tracking-normal">
+              <span className="text-gold-accent inline-flex items-center gap-0.5 normal-case text-[10px]">
                 <ShieldCheck size={11} /> Secured Profile
               </span>
             </label>
@@ -168,7 +150,7 @@ export default function StudioCreatePage() {
 
         <div>
           <label className="block font-interface text-xs uppercase tracking-wider text-text-muted mb-2">
-            High-Resolution Media Canvas Uniform Resource Locator (Image URL)
+            High-Resolution Media Canvas URL
           </label>
           <input
             type="url"
@@ -177,13 +159,13 @@ export default function StudioCreatePage() {
             onChange={(e) => setImageUrl(e.target.value)}
             disabled={isLoading}
             className="w-full bg-bg-card border border-white/8 focus:border-gold-accent text-sm text-text-primary px-4 py-3 rounded-lg font-ticker outline-none transition-colors duration-200"
-            placeholder="https://images.unsplash.com/your-premium-curated-art-asset"
+            placeholder="https://images.unsplash.com/..."
           />
         </div>
 
         <div>
           <label className="block font-interface text-xs uppercase tracking-wider text-text-muted mb-2">
-            Curator Editorial Notes & Provenance Framework Description
+            Curator Editorial Notes & Provenance
           </label>
           <textarea
             required
@@ -192,7 +174,7 @@ export default function StudioCreatePage() {
             onChange={(e) => setDescription(e.target.value)}
             disabled={isLoading}
             className="w-full bg-bg-card border border-white/8 focus:border-gold-accent text-sm text-text-primary px-4 py-3 rounded-lg font-editorial outline-none transition-colors duration-200 resize-none leading-relaxed"
-            placeholder="Elaborate extensively on historical canvas creation profiles, dimension materials, medium choices, and contextual collection themes..."
+            placeholder="Elaborate extensively on historical canvas creation profiles..."
           />
         </div>
 
@@ -205,13 +187,7 @@ export default function StudioCreatePage() {
             disabled={isLoading || !artistId}
             className="bg-text-primary hover:bg-gold-accent disabled:bg-white/2 text-bg-main disabled:text-text-muted font-interface font-medium text-xs uppercase tracking-widest py-3.5 px-6 rounded-lg flex items-center justify-center gap-2 cursor-pointer transition-colors duration-300"
           >
-            {isLoading ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <>
-                Register Exhibition Asset <Paintbrush size={14} />
-              </>
-            )}
+            {isLoading ? <Loader2 size={14} className="animate-spin" /> : <>Register Exhibition Asset <Paintbrush size={14} /></>}
           </motion.button>
         </div>
 
