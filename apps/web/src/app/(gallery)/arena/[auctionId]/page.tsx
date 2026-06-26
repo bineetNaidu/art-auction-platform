@@ -1,10 +1,12 @@
 import React from "react";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { Auction, Artwork, Bid } from "@platform/shared-types";
 import { ArenaRoomClient } from "./ArenaRoomClient";
+import { decodeToken } from "@/lib/auth";
 
 interface PageProps {
   params: Promise<{ auctionId: string }>;
@@ -14,11 +16,16 @@ export default async function LiveAuctionArenaPage({ params }: PageProps) {
   const resolvedParams = await params;
   const { auctionId } = resolvedParams;
 
-  // Extract authentication token from session cookies
+  // 1. HARDENED SERVER AUTH GUARD: Intercept anonymous traffic instantly
   const cookieStore = await cookies();
   const token = cookieStore.get("aura_session_token")?.value;
 
-  // 1. Fetch the Active Auction Event profile
+  if (!token || !decodeToken(token)) {
+    // Evict traffic straight to security gates with return-path preservation
+    redirect(`/login?callback=/arena/${auctionId}`);
+  }
+
+  // 2. Fetch the Active Auction Event profile safely with verified token
   const auctionResponse = await apiClient<Auction>(`/auctions/${auctionId}`, {
     token,
     cache: "no-store",
@@ -50,7 +57,7 @@ export default async function LiveAuctionArenaPage({ params }: PageProps) {
 
   const auction = auctionResponse.data;
 
-  // 2. Resolve the relational artwork data and chronological bid history parallel stack
+  // 3. Resolve relational artwork profile data and chronological live bids in parallel
   const [artworkResponse, bidsResponse] = await Promise.all([
     apiClient<Artwork>(`/artworks/${auction.artworkId}`, { token, cache: "no-store" }),
     apiClient<Bid[]>(`/bids/auction/${auctionId}`, { token, cache: "no-store" }),
