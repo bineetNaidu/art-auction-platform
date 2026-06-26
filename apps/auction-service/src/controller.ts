@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { db } from './db.js';
+import { db } from './db';
 import { auctions } from './schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { PlatformEventName, CloudEvent } from '@platform/shared-events';
 import { ApiResponse } from '@platform/shared-types';
 import { Producer } from 'kafkajs';
@@ -14,6 +14,44 @@ export const createAuction =
   (producer: Producer, logger: any) => async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { artworkId, sellerId, startPrice, startTime, endTime } = req.body;
+
+      // 1. DEFENSIVE GUARD: Prevent scheduling actions backward in time context
+      const parsedStart = new Date(startTime).getTime();
+      if (parsedStart < Date.now()) {
+        const pastErrorRes: ApiResponse = {
+          success: false,
+          error: {
+            code: 'BAD_REQUEST',
+            details: 'Scheduling conflict: The auction starting window cannot reside in the past.',
+          },
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(400).json(pastErrorRes);
+      }
+
+      // 2. DEFENSIVE GUARD: Ensure an asset isn't double-allocated across concurrent live windows
+      const [existingActiveAuction] = await db
+        .select()
+        .from(auctions)
+        .where(
+          and(
+            eq(auctions.artworkId, artworkId),
+            inArray(auctions.status, ['pending', 'active']), // Checks if asset is currently locked or upcoming
+          ),
+        )
+        .limit(1);
+
+      if (existingActiveAuction) {
+        const conflictRes: ApiResponse = {
+          success: false,
+          error: {
+            code: 'CONFLICT',
+            details: `This artwork is already locked inside an active or upcoming auction cycle: ${existingActiveAuction.id}`,
+          },
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(409).json(conflictRes); // 409 Conflict represents clear state duplication blocks
+      }
 
       const [newAuction] = await db
         .insert(auctions)
