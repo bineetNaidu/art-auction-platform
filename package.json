@@ -11,7 +11,22 @@
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write \"**/*.{ts,js,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,js,json,md}\""
+    "format:check": "prettier --check \"**/*.{ts,js,json,md}\"",
+    
+    "infra:up": "docker compose -f infra/docker/docker-compose.infra.yml up -d",
+    "infra:down": "docker compose -f infra/docker/docker-compose.infra.yml down",
+    "infra:wipe": "docker compose -f infra/docker/docker-compose.infra.yml down -v",
+    "infra:logs": "docker compose -f infra/docker/docker-compose.infra.yml logs -f",
+
+    "apps:up": "docker compose -f infra/docker/docker-compose.apps.yml up -d",
+    "apps:up:build": "docker compose -f infra/docker/docker-compose.apps.yml up --build -d",
+    "apps:down": "docker compose -f infra/docker/docker-compose.apps.yml down",
+    "apps:logs": "docker compose -f infra/docker/docker-compose.apps.yml logs -f",
+
+    "logs:gateway": "docker compose -f infra/docker/docker-compose.apps.yml logs -f gateway-service",
+    "logs:auth": "docker compose -f infra/docker/docker-compose.apps.yml logs -f auth-service",
+    "logs:bid": "docker compose -f infra/docker/docker-compose.apps.yml logs -f bid-service",
+    "logs:notification": "docker compose -f infra/docker/docker-compose.apps.yml logs -f notification-service"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
