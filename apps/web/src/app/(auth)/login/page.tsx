@@ -1,19 +1,25 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { getClientSession } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Extract dynamic return path configuration if supplied by an auth guard
+  const callbackUrl = searchParams.get("callback") || "/";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,12 +37,21 @@ export default function LoginPage() {
       document.cookie = `aura_session_token=${response.data.token}; path=/; max-age=86400; SameSite=Strict; Secure`;
       
       // Navigate to the gallery catalog board on successful entry
-      router.push("/");
+      // Route the authenticated identity straight to their intended viewing floor
+      router.push(callbackUrl);
     } else {
       setErrorMessage(response.message || "Invalid credentials. Please verify your collection keys.");
       setIsLoading(false);
     }
   };
+
+  // EARLY EXIT BOUNDARY: If a valid session is active, bypass the login screen instantly
+  useEffect(() => {
+    const activeSession = getClientSession();
+    if (activeSession) {
+      router.replace(callbackUrl);
+    }
+  }, [router, callbackUrl]);
 
   return (
     <motion.div
