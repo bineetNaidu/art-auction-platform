@@ -29,3 +29,14 @@ export function getClientSession(): SessionPayload | null {
     return null;
   }
 }
+
+/**
+ * The Logout Function
+ */
+export function logout(){
+  if (typeof window === 'undefined') return false;
+   // Evict session token from client domain memory context
+   document.cookie = "aura_session_token=; path=/; max-age=0; SameSite=Strict; Secure";
+
+   return true
+}

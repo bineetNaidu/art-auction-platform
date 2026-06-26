@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Eye, Paintbrush, ShieldCheck, LogOut, LogIn } from "lucide-react";
 import { User } from "@platform/shared-types";
+import { getClientSession, logout } from "@/lib/auth";
 
 export default function Navbar() {
     const pathname = usePathname();
@@ -13,25 +14,13 @@ export default function Navbar() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [userRole, setUserRole] = useState<User["role"] | null>(null);
 
-    // Synchronize client-side session state tracking on mount or path shift
+    // Synchronize client-side session state tracking using the shared auth utility
     useEffect(() => {
-        const match = document.cookie.match(/(^| )aura_session_token=([^;]+)/);
+        const session = getClientSession();
 
-        if (match) {
+        if (session) {
             setIsAuthenticated(true);
-            const token = match[2];
-
-            try {
-                // Natively unpack the cryptographic base64 JWT payload segment
-                const payloadBase64 = token.split(".")[1];
-                if (payloadBase64) {
-                    const decodedPayload = JSON.parse(window.atob(payloadBase64));
-                    setUserRole(decodedPayload.role || "buyer"); // Fallback to safe lower privilege
-                }
-            } catch (error) {
-                console.error("Security core signature unpacking failure:", error);
-                setUserRole(null);
-            }
+            setUserRole(session.role || "buyer"); // Safe lower privilege default fallback
         } else {
             setIsAuthenticated(false);
             setUserRole(null);
@@ -39,8 +28,8 @@ export default function Navbar() {
     }, [pathname]);
 
     const handleLogout = () => {
-        // Evict session token from client domain memory context
-        document.cookie = "aura_session_token=; path=/; max-age=0; SameSite=Strict; Secure";
+        logout();
+        
         setIsAuthenticated(false);
         setUserRole(null);
         router.refresh();
@@ -63,8 +52,10 @@ export default function Navbar() {
                     Aura
                 </Link>
 
-                {/* Global Navigation Links Map */}
+                {/* Global Navigation Links Map with Privilege Guards */}
                 <div className="flex items-center gap-1 sm:gap-4 font-interface text-[11px] uppercase tracking-widest font-medium">
+
+                    {/* Public Access Viewport */}
                     <Link
                         href="/"
                         className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors ${pathname === "/"
@@ -75,25 +66,31 @@ export default function Navbar() {
                         <Eye size={12} /> Exhibition
                     </Link>
 
-                    <Link
-                        href="/studio/create"
-                        className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors ${pathname.startsWith("/studio")
-                                ? "bg-white/6 text-gold-accent border border-gold-accent/20"
-                                : "text-text-muted hover:text-text-primary"
-                            }`}
-                    >
-                        <Paintbrush size={12} /> Studio
-                    </Link>
+                    {/* Creator Studio Interface — Guarded: Visible only to Sellers and Admins */}
+                    {(userRole === "seller" || userRole === "admin") && (
+                        <Link
+                            href="/studio/create"
+                            className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors ${pathname.startsWith("/studio")
+                                    ? "bg-white/6 text-gold-accent border border-gold-accent/20"
+                                    : "text-text-muted hover:text-text-primary"
+                                }`}
+                        >
+                            <Paintbrush size={12} /> Studio
+                        </Link>
+                    )}
 
-                    <Link
-                        href="/admin/dashboard"
-                        className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors ${pathname.startsWith("/admin")
-                                ? "bg-white/6 text-gold-accent border border-gold-accent/20"
-                                : "text-text-muted hover:text-text-primary"
-                            }`}
-                    >
-                        <ShieldCheck size={12} /> Registry
-                    </Link>
+                    {/* Security Registry Dashboard — Strictly Guarded: Visible *ONLY* to Admins */}
+                    {userRole === "admin" && (
+                        <Link
+                            href="/admin/dashboard"
+                            className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors ${pathname.startsWith("/admin")
+                                    ? "bg-white/6 text-gold-accent border border-gold-accent/20"
+                                    : "text-text-muted hover:text-text-primary"
+                                }`}
+                        >
+                            <ShieldCheck size={12} /> Registry
+                        </Link>
+                    )}
                 </div>
 
                 {/* Action Call Context Node */}
